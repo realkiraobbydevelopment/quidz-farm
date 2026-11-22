@@ -1,2 +1,1 @@
-# quidz-farm
-quidz farm
+its a quidz farm
