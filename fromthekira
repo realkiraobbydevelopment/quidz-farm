@@ -79,6 +79,16 @@ local function createButton(name, color, position, size)
     return button
 end
 
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new(0, 0))
+end)
+
 local startButton = createButton(
     "START",
     Color3.fromRGB(30, 170, 70),
@@ -301,7 +311,7 @@ startButton.MouseButton1Click:Connect(function()
     task.spawn(reportLoop, currentSession, activeWebhook, interval)
 end)
 
--- STOP
+
 stopButton.MouseButton1Click:Connect(function()
     if not running then
         return
