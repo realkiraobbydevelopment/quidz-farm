@@ -1,0 +1,321 @@
+-- Im not updating my game ever btw
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+
+local target = CFrame.new(407.50, 29, -27.50)
+
+local running = false
+local session = 0
+local activeWebhook = ""
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "QuidzFarm"
+gui.ResetOnSpawn = false
+gui.Parent = CoreGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 340, 0, 260)
+main.Position = UDim2.new(0.5, -170, 0.5, -130)
+main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "quidz farm"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.Parent = main
+
+local function createInput(placeholder, position, size)
+    local box = Instance.new("TextBox")
+    box.Size = size
+    box.Position = position
+    box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.PlaceholderText = placeholder
+    box.Text = ""
+    box.TextSize = 13
+    box.Font = Enum.Font.Gotham
+    box.ClearTextOnFocus = false
+    box.Parent = main
+
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+    return box
+end
+
+local webhookBox = createInput(
+    "webhook (optional)",
+    UDim2.new(0, 10, 0, 45),
+    UDim2.new(0, 200, 0, 35)
+)
+
+local intervalBox = createInput(
+    "interval in minutes",
+    UDim2.new(0, 220, 0, 45),
+    UDim2.new(0, 110, 0, 35)
+)
+
+local function createButton(name, color, position, size)
+    local button = Instance.new("TextButton")
+    button.Size = size
+    button.Position = position
+    button.BackgroundColor3 = color
+    button.Text = name
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 15
+    button.Parent = main
+
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 7)
+    return button
+end
+
+local startButton = createButton(
+    "START",
+    Color3.fromRGB(30, 170, 70),
+    UDim2.new(0, 10, 0, 95),
+    UDim2.new(0, 150, 0, 40)
+)
+
+local stopButton = createButton(
+    "STOP",
+    Color3.fromRGB(190, 45, 45),
+    UDim2.new(0, 180, 0, 95),
+    UDim2.new(0, 150, 0, 40)
+)
+
+local renderButton = createButton(
+    "DISABLE RENDERING",
+    Color3.fromRGB(60, 60, 160),
+    UDim2.new(0, 10, 0, 150),
+    UDim2.new(0, 320, 0, 40)
+)
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0, 30)
+status.Position = UDim2.new(0, 0, 0, 205)
+status.BackgroundTransparency = 1
+status.Text = "Status: Stopped"
+status.TextColor3 = Color3.fromRGB(200, 200, 200)
+status.Font = Enum.Font.Gotham
+status.TextSize = 13
+status.Parent = main
+
+-- MoneyDisplay TextLabel finder
+local function getMoney()
+    local success, result = pcall(function()
+        local moneyDisplay = player.PlayerGui
+            :WaitForChild("GameUI")
+            :WaitForChild("LeftHandButtons")
+            :WaitForChild("MoneyDisplay")
+
+        local label = moneyDisplay:FindFirstChildWhichIsA(
+            "TextLabel",
+            true
+        )
+
+        if not label then
+            return "TextLabel not found"
+        end
+
+        print("[Quidz Farm] Money:", label.Text)
+
+        return label.Text
+    end)
+
+    if success then
+        return result
+    end
+
+    warn("[Quidz Farm] Error:", result)
+    return "Unknown"
+end
+
+local function getRequestFunction()
+    return request or http_request or
+        (syn and syn.request) or
+        (fluxus and fluxus.request)
+end
+
+local function sendEmbed(webhook, message, color)
+    if webhook == "" then
+        return false, "No webhook"
+    end
+
+    local requestFunction = getRequestFunction()
+
+    if not requestFunction then
+        return false, "HTTP unavailable"
+    end
+
+    local payload = {
+        embeds = {
+            {
+                description = message,
+                color = color,
+                timestamp = DateTime.now():ToIsoDate()
+            }
+        }
+    }
+
+    local success, response = pcall(function()
+        return requestFunction({
+            Url = webhook,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode(payload)
+        })
+    end)
+
+    if not success then
+        warn("[Quidz Farm] Webhook error:", response)
+        return false, tostring(response)
+    end
+
+    local code = response.StatusCode or response.Status or 0
+
+    if code == 200 or code == 204 then
+        return true, "Sent"
+    end
+
+    warn("[Quidz Farm] Webhook HTTP error:", code)
+    return false, "HTTP " .. tostring(code)
+end
+
+-- Teleport loop
+local function teleportLoop(mySession)
+    while running and session == mySession do
+        local character = player.Character
+        local root = character and character:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+        if root then
+            root.CFrame = target
+        end
+
+        task.wait(3)
+    end
+end
+
+local function reportLoop(mySession, webhook, interval)
+    while running and session == mySession do
+        local money = getMoney()
+
+        if webhook ~= "" then
+            local message =
+                "quidz counter: " .. tostring(money)
+                .. "\nmade by kira obby development"
+
+            local success, result = sendEmbed(
+                webhook,
+                message,
+                65280
+            )
+
+            if success then
+                status.Text = "Status: Running | Report sent"
+            else
+                status.Text = "Status: " .. result
+            end
+        else
+            status.Text = "Status: Running | " .. tostring(money)
+        end
+
+        task.wait(interval * 60)
+    end
+end
+-- tbh i let the ai do this one
+local blackScreen = Instance.new("ScreenGui")
+blackScreen.Name = "QuidzBlackScreen"
+blackScreen.IgnoreGuiInset = true
+blackScreen.ResetOnSpawn = true
+blackScreen.DisplayOrder = 999999
+blackScreen.Enabled = false
+blackScreen.Parent = CoreGui
+
+local blackFrame = Instance.new("Frame")
+blackFrame.Size = UDim2.new(1, 0, 1, 0)
+blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+blackFrame.BorderSizePixel = 0
+blackFrame.Parent = blackScreen
+
+renderButton.MouseButton1Click:Connect(function()
+    blackScreen.Enabled = true
+end)
+
+-- Remove black screen after character reset
+player.CharacterAdded:Connect(function()
+    if blackScreen then
+        blackScreen:Destroy()
+        blackScreen = nil
+    end
+end)
+
+startButton.MouseButton1Click:Connect(function()
+    if running then
+        return
+    end
+
+    local webhook = webhookBox.Text
+    local interval = tonumber(intervalBox.Text)
+
+    if not interval or interval <= 0 then
+        interval = 1
+    end
+
+    if webhook ~= "" and not webhook:match(
+        "^https://discord%.com/api/webhooks/"
+    ) then
+        status.Text = "Invalid webhook URL"
+        return
+    end
+
+    running = true
+    session = session + 1
+    activeWebhook = webhook
+
+    local currentSession = session
+
+    status.Text = "Status: Running"
+
+    task.spawn(
+        sendEmbed,
+        activeWebhook,
+        "Script started",
+        65280
+    )
+
+    task.spawn(teleportLoop, currentSession)
+    task.spawn(reportLoop, currentSession, activeWebhook, interval)
+end)
+
+-- STOP
+stopButton.MouseButton1Click:Connect(function()
+    if not running then
+        return
+    end
+
+    running = false
+    session = session + 1
+
+    status.Text = "Status: Stopped"
+
+    task.spawn(
+        sendEmbed,
+        activeWebhook,
+        "Script stopped",
+        16711680
+    )
+end)
