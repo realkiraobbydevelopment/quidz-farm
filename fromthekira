@@ -6,6 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 local VirtualUser = game:GetService("VirtualUser")
 
 local target = CFrame.new(407.50, 29, -27.50)
+local webhookFile = "QuidzFarmWebhook.txt"
 
 local running = false
 local session = 0
@@ -67,6 +68,22 @@ local intervalBox = createInput(
     UDim2.new(0, 110, 0, 35)
 )
 
+if isfile and readfile then
+    pcall(function()
+        if isfile(webhookFile) then
+            webhookBox.Text = readfile(webhookFile)
+        end
+    end)
+end
+
+webhookBox.FocusLost:Connect(function()
+    if writefile then
+        pcall(function()
+            writefile(webhookFile, webhookBox.Text)
+        end)
+    end
+end)
+
 local function createButton(name, color, position, size)
     local button = Instance.new("TextButton")
     button.Size = size
@@ -81,8 +98,6 @@ local function createButton(name, color, position, size)
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 7)
     return button
 end
-
---dew a faggot
 
 local startButton = createButton(
     "START",
@@ -184,8 +199,6 @@ local function getRequestFunction()
         (fluxus and fluxus.request)
 end
 
---I let the ai do this one its too hard
-
 local function sendEmbed(webhook, message, color)
     if webhook == "" then
         return false, "No webhook"
@@ -233,6 +246,18 @@ local function sendEmbed(webhook, message, color)
     return false, "HTTP " .. tostring(code)
 end
 
+local function getReportStats()
+    local money = getMoney()
+    local currentMoney = parseMoney(money)
+    local earned = currentMoney - startingMoney
+
+    local elapsedSeconds = math.max(0, os.time() - startTime)
+    local elapsedHours = math.max(elapsedSeconds / 3600, 0.0001)
+    local hourlyEarnings = earned / elapsedHours
+
+    return money, earned, hourlyEarnings, elapsedSeconds
+end
+
 local function teleportLoop(mySession)
     while running and session == mySession do
         local character = player.Character
@@ -272,10 +297,14 @@ local function quidzCounterLoop(mySession, webhook, interval)
             break
         end
 
-        local money = getMoney()
+        local money, earned, hourlyEarnings = getReportStats()
 
         local message =
-            "**quidz counter: " .. tostring(money) .. "**"
+            "**Quidz Counter**"
+            .. "\n\n**Starting Quidz: " .. tostring(startingMoney) .. "**"
+            .. "\n**Current Quidz: " .. tostring(money) .. "**"
+            .. "\n**Quidz Earned: " .. tostring(earned) .. "**"
+            .. "\n**Hourly Quidz: " .. string.format("%.2f", hourlyEarnings) .. "**"
             .. "\n\nmade by kira obby development"
 
         if webhook ~= "" then
@@ -308,15 +337,8 @@ local function reportLoop(mySession, webhook)
             break
         end
 
-        local money = getMoney()
-        local currentMoney = parseMoney(money)
-
-        local earned = currentMoney - startingMoney
-
-        local elapsedSeconds = os.time() - startTime
-        local elapsedHours = math.max(elapsedSeconds / 3600, 0.0001)
-
-        local hourlyEarnings = earned / elapsedHours
+        local money, earned, hourlyEarnings, elapsedSeconds =
+            getReportStats()
 
         local currentTime = os.date("%H:%M")
         local runningTime = formatDuration(elapsedSeconds)
@@ -392,6 +414,12 @@ startButton.MouseButton1Click:Connect(function()
         return
     end
 
+    if writefile then
+        pcall(function()
+            writefile(webhookFile, webhook)
+        end)
+    end
+
     running = true
     session = session + 1
     activeWebhook = webhook
@@ -444,4 +472,4 @@ stopButton.MouseButton1Click:Connect(function()
         16711680
     )
 end)
---Can you tell i play bee swarm because of the hourly reports?
+--I hate faggots
