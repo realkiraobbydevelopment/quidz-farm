@@ -1,14 +1,17 @@
--- Im not updating my game ever btw
+--This sucks tbh, also dew i hate you disgusting faggot
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
+local VirtualUser = game:GetService("VirtualUser")
 
 local target = CFrame.new(407.50, 29, -27.50)
 
 local running = false
 local session = 0
 local activeWebhook = ""
+local startingMoney = 0
+local startTime = 0
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "QuidzFarm"
@@ -79,16 +82,6 @@ local function createButton(name, color, position, size)
     return button
 end
 
-local Players = game:GetService("Players")
-local VirtualUser = game:GetService("VirtualUser")
-
-local player = Players.LocalPlayer
-
-player.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new(0, 0))
-end)
-
 local startButton = createButton(
     "START",
     Color3.fromRGB(30, 170, 70),
@@ -120,7 +113,6 @@ status.Font = Enum.Font.Gotham
 status.TextSize = 13
 status.Parent = main
 
--- MoneyDisplay TextLabel finder
 local function getMoney()
     local success, result = pcall(function()
         local moneyDisplay = player.PlayerGui
@@ -148,6 +140,40 @@ local function getMoney()
 
     warn("[Quidz Farm] Error:", result)
     return "Unknown"
+end
+
+local function parseMoney(value)
+    local cleaned = tostring(value)
+        :gsub(",", "")
+        :gsub("[^%d%.%-]", "")
+
+    return tonumber(cleaned) or 0
+end
+
+local function formatDuration(seconds)
+    seconds = math.max(0, math.floor(seconds))
+
+    local days = math.floor(seconds / 86400)
+    local hours = math.floor((seconds % 86400) / 3600)
+    local minutes = math.floor((seconds % 3600) / 60)
+    local remainingSeconds = seconds % 60
+
+    if days > 0 then
+        return string.format(
+            "%02d:%02d:%02d:%02d",
+            days,
+            hours,
+            minutes,
+            remainingSeconds
+        )
+    end
+
+    return string.format(
+        "%02d:%02d:%02d",
+        hours,
+        minutes,
+        remainingSeconds
+    )
 end
 
 local function getRequestFunction()
@@ -203,7 +229,6 @@ local function sendEmbed(webhook, message, color)
     return false, "HTTP " .. tostring(code)
 end
 
--- Teleport loop
 local function teleportLoop(mySession)
     while running and session == mySession do
         local character = player.Character
@@ -219,15 +244,55 @@ local function teleportLoop(mySession)
     end
 end
 
-local function reportLoop(mySession, webhook, interval)
+local function antiAFKLoop(mySession)
     while running and session == mySession do
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new(0, 0))
+        end)
+
+        task.wait(60)
+    end
+end
+--I let claude do this part its too complicated
+local function reportLoop(mySession, webhook)
+    while running and session == mySession do
+        local remaining = 3600 - (os.time() % 3600)
+        local deadline = os.clock() + remaining
+
+        while running and session == mySession
+            and os.clock() < deadline do
+
+            task.wait(math.min(1, deadline - os.clock()))
+        end
+
+        if not running or session ~= mySession then
+            break
+        end
+
         local money = getMoney()
+        local currentMoney = parseMoney(money)
+
+        local earned = currentMoney - startingMoney
+
+        local elapsedSeconds = os.time() - startTime
+        local elapsedHours = math.max(elapsedSeconds / 3600, 0.0001)
+
+        local hourlyEarnings = earned / elapsedHours
+
+        local currentTime = os.date("%H:%M")
+        local runningTime = formatDuration(elapsedSeconds)
+
+        local message =
+            "**Hourly Report " .. currentTime .. "**"
+            .. "\n\n**Starting Quidz: " .. tostring(startingMoney) .. "**"
+            .. "\n**Current Quidz: " .. tostring(money) .. "**"
+            .. "\n**Quidz Earned: " .. tostring(earned) .. "**"
+            .. "\n**Hourly Quidz: " .. string.format("%.2f", hourlyEarnings) .. "**"
+            .. "\n**Running Time: " .. runningTime .. "**"
+            .. "\n\nmade by kira obby development"
 
         if webhook ~= "" then
-            local message =
-                "quidz counter: " .. tostring(money)
-                .. "\nmade by kira obby development"
-
             local success, result = sendEmbed(
                 webhook,
                 message,
@@ -235,18 +300,16 @@ local function reportLoop(mySession, webhook, interval)
             )
 
             if success then
-                status.Text = "Status: Running | Report sent"
+                status.Text = "Status: Hourly report sent"
             else
-                status.Text = "Status: " .. result
+                status.Text = "Status: " .. tostring(result)
             end
         else
             status.Text = "Status: Running | " .. tostring(money)
         end
-
-        task.wait(interval * 60)
     end
 end
--- tbh i let the ai do this one
+
 local blackScreen = Instance.new("ScreenGui")
 blackScreen.Name = "QuidzBlackScreen"
 blackScreen.IgnoreGuiInset = true
@@ -262,10 +325,11 @@ blackFrame.BorderSizePixel = 0
 blackFrame.Parent = blackScreen
 
 renderButton.MouseButton1Click:Connect(function()
-    blackScreen.Enabled = true
+    if blackScreen and blackScreen.Parent then
+        blackScreen.Enabled = true
+    end
 end)
 
--- Remove black screen after character reset
 player.CharacterAdded:Connect(function()
     if blackScreen then
         blackScreen:Destroy()
@@ -298,6 +362,9 @@ startButton.MouseButton1Click:Connect(function()
 
     local currentSession = session
 
+    startingMoney = parseMoney(getMoney())
+    startTime = os.time()
+
     status.Text = "Status: Running"
 
     task.spawn(
@@ -308,9 +375,9 @@ startButton.MouseButton1Click:Connect(function()
     )
 
     task.spawn(teleportLoop, currentSession)
-    task.spawn(reportLoop, currentSession, activeWebhook, interval)
+    task.spawn(antiAFKLoop, currentSession)
+    task.spawn(reportLoop, currentSession, activeWebhook)
 end)
-
 
 stopButton.MouseButton1Click:Connect(function()
     if not running then
@@ -329,3 +396,4 @@ stopButton.MouseButton1Click:Connect(function()
         16711680
     )
 end)
+
