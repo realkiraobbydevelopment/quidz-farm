@@ -1,4 +1,4 @@
---This sucks tbh, also dew i hate you disgusting faggot
+
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local HttpService = game:GetService("HttpService")
@@ -81,6 +81,8 @@ local function createButton(name, color, position, size)
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 7)
     return button
 end
+
+--dew a faggot
 
 local startButton = createButton(
     "START",
@@ -182,6 +184,8 @@ local function getRequestFunction()
         (fluxus and fluxus.request)
 end
 
+--I let the ai do this one its too hard
+
 local function sendEmbed(webhook, message, color)
     if webhook == "" then
         return false, "No webhook"
@@ -254,7 +258,42 @@ local function antiAFKLoop(mySession)
         task.wait(60)
     end
 end
---I let claude do this part its too complicated
+
+local function quidzCounterLoop(mySession, webhook, interval)
+    while running and session == mySession do
+        local deadline = os.clock() + interval * 60
+
+        while running and session == mySession
+            and os.clock() < deadline do
+            task.wait(math.min(1, deadline - os.clock()))
+        end
+
+        if not running or session ~= mySession then
+            break
+        end
+
+        local money = getMoney()
+
+        local message =
+            "**quidz counter: " .. tostring(money) .. "**"
+            .. "\n\nmade by kira obby development"
+
+        if webhook ~= "" then
+            local success, result = sendEmbed(
+                webhook,
+                message,
+                65280
+            )
+
+            if success then
+                status.Text = "Status: Quidz counter sent"
+            else
+                status.Text = "Status: " .. tostring(result)
+            end
+        end
+    end
+end
+
 local function reportLoop(mySession, webhook)
     while running and session == mySession do
         local remaining = 3600 - (os.time() % 3600)
@@ -262,7 +301,6 @@ local function reportLoop(mySession, webhook)
 
         while running and session == mySession
             and os.clock() < deadline do
-
             task.wait(math.min(1, deadline - os.clock()))
         end
 
@@ -304,8 +342,6 @@ local function reportLoop(mySession, webhook)
             else
                 status.Text = "Status: " .. tostring(result)
             end
-        else
-            status.Text = "Status: Running | " .. tostring(money)
         end
     end
 end
@@ -376,7 +412,19 @@ startButton.MouseButton1Click:Connect(function()
 
     task.spawn(teleportLoop, currentSession)
     task.spawn(antiAFKLoop, currentSession)
-    task.spawn(reportLoop, currentSession, activeWebhook)
+
+    task.spawn(
+        quidzCounterLoop,
+        currentSession,
+        activeWebhook,
+        interval
+    )
+
+    task.spawn(
+        reportLoop,
+        currentSession,
+        activeWebhook
+    )
 end)
 
 stopButton.MouseButton1Click:Connect(function()
@@ -396,4 +444,4 @@ stopButton.MouseButton1Click:Connect(function()
         16711680
     )
 end)
-
+--Can you tell i play bee swarm because of the hourly reports?
